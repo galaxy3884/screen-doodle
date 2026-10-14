@@ -1,0 +1,8 @@
+draw
+overlay.yaml
+*.app
+*.dmg
+*.iconset
+icheck/
+backup_old/
+.DS_Store
