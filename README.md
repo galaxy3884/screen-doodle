@@ -22,12 +22,12 @@ Strokes stay visible after you leave drawing mode, and mouse clicks pass through
 **Build**
 ```bash
 ./build.sh        # produces ./draw
-./package.sh      # produces Малювалка.app and Малювалка.dmg
+./package.sh      # produces ScreenDoodle.app and ScreenDoodle.dmg
 ```
 
 **Install of an unsigned build.** The app is ad-hoc signed, so Gatekeeper blocks it. After copying it to `/Applications`, run:
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Малювалка.app"
+xattr -dr com.apple.quarantine "/Applications/ScreenDoodle.app"
 ```
 
 ## Українська
@@ -52,10 +52,10 @@ xattr -dr com.apple.quarantine "/Applications/Малювалка.app"
 **Збірка**
 ```bash
 ./build.sh        # створює ./draw
-./package.sh      # створює Малювалка.app і Малювалка.dmg
+./package.sh      # створює ScreenDoodle.app і ScreenDoodle.dmg
 ```
 
 **Встановлення незавіреної збірки.** Застосунок підписано ad-hoc, тому Gatekeeper його блокує. Після копіювання в `/Applications` виконай:
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Малювалка.app"
+xattr -dr com.apple.quarantine "/Applications/ScreenDoodle.app"
 ```

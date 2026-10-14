@@ -1,10 +1,10 @@
 #!/bin/bash
-# Збирає Малювалка.app і Малювалка.dmg
+# Збирає ScreenDoodle.app і ScreenDoodle.dmg
 set -e
 cd "$(dirname "$0")"
 ./build.sh
-APP="Малювалка.app"
-rm -rf "$APP" dmg_tmp Малювалка.dmg
+APP="ScreenDoodle.app"
+rm -rf "$APP" dmg_tmp ScreenDoodle.dmg
 mkdir -p "$APP/Contents/MacOS"
 cp draw "$APP/Contents/MacOS/draw"
 mkdir -p "$APP/Contents/Resources" AppIcon.iconset
@@ -18,8 +18,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Малювалка</string>
-<key>CFBundleDisplayName</key><string>Малювалка</string>
+<key>CFBundleName</key><string>ScreenDoodle</string>
+<key>CFBundleDisplayName</key><string>ScreenDoodle</string>
 <key>CFBundleIdentifier</key><string>local.oleg.malyuvalka</string>
 <key>CFBundleExecutable</key><string>draw</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
@@ -36,6 +36,6 @@ codesign --force --deep --sign - "$APP"
 mkdir dmg_tmp
 ditto --norsrc --noextattr --noqtn "$APP" "dmg_tmp/$APP"
 ln -s /Applications dmg_tmp/Applications
-hdiutil create -volname "Малювалка" -srcfolder dmg_tmp -ov -format UDZO Малювалка.dmg >/dev/null
+hdiutil create -volname "ScreenDoodle" -srcfolder dmg_tmp -ov -format UDZO ScreenDoodle.dmg >/dev/null
 rm -rf dmg_tmp
-echo "Готово: Малювалка.dmg"
+echo "Готово: ScreenDoodle.dmg"
