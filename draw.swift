@@ -71,6 +71,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var item: NSStatusItem!
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        buildWindows()
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                                               object: nil, queue: .main) { [weak self] _ in self?.buildWindows() }
+
+        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.title = "✎"
+        let m = NSMenu()
+        m.addItem(withTitle: "Toggle Drawing (⌃⌥D)", action: #selector(toggle), keyEquivalent: "")
+        m.addItem(withTitle: "Clear (⌃⌥C)", action: #selector(clear), keyEquivalent: "")
+        m.addItem(.separator())
+        m.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        m.items.forEach { if $0.action != #selector(NSApplication.terminate(_:)) { $0.target = self } }
+        item.menu = m
+
+        registerHotKeys()
+    }
+
+    // Rebuilds one overlay window per screen; strokes are dropped because their views are replaced.
+    func buildWindows() {
+        windows.forEach { $0.close() }
+        windows.removeAll(); views.removeAll(); history.removeAll()
         for screen in NSScreen.screens {
             let w = DrawWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
             w.setFrame(screen.frame, display: false)
@@ -79,25 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.hasShadow = false
             w.level = .screenSaver
             w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-            w.ignoresMouseEvents = true
+            w.ignoresMouseEvents = !drawing
             w.isReleasedWhenClosed = false
             let v = CanvasView(frame: NSRect(origin: .zero, size: screen.frame.size))
             w.contentView = v
             w.orderFrontRegardless()
             windows.append(w); views.append(v)
         }
-
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "✎"
-        let m = NSMenu()
-        m.addItem(withTitle: "Малювати / зупинити (⌃⌥D)", action: #selector(toggle), keyEquivalent: "")
-        m.addItem(withTitle: "Очистити (⌃⌥C)", action: #selector(clear), keyEquivalent: "")
-        m.addItem(.separator())
-        m.addItem(withTitle: "Вийти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        m.items.forEach { if $0.action != #selector(NSApplication.terminate(_:)) { $0.target = self } }
-        item.menu = m
-
-        registerHotKeys()
     }
 
     @objc func toggle() {
