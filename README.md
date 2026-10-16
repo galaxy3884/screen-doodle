@@ -4,6 +4,8 @@
 
 A tiny macOS menu bar app for drawing on top of your screen: annotate anything, clear it, undo, and keep working underneath.
 
+![ScreenDoodle drawing over a window](docs/screenshot.png)
+
 **Hotkeys**
 - `⌃⌥D` — toggle drawing mode
 - `⌃⌥C` — clear the screen
