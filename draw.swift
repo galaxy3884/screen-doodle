@@ -1,49 +1,111 @@
 import Cocoa
 import Carbon
 
-struct Stroke { var points: [NSPoint]; var color: NSColor; var width: CGFloat }
+enum Tool { case pen, text, arrow, rect, ellipse, block }
+struct Stroke { var points: [NSPoint]; var color: NSColor; var width: CGFloat; var kind: Tool = .pen; var text = "" }
 
 var penColor = NSColor.systemRed
 var penWidth: CGFloat = 4
+var tool: Tool = .pen
 var history: [CanvasView] = []
 var appDelegate: AppDelegate!
 
-final class CanvasView: NSView {
+final class CanvasView: NSView, NSTextFieldDelegate {
     var strokes: [Stroke] = []
     var current: Stroke?
+    var field: NSTextField?
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: .crosshair) }
 
     override func draw(_ dirtyRect: NSRect) {
-        for s in strokes + (current.map { [$0] } ?? []) {
+        for s in strokes + (current.map { [$0] } ?? []) { draw(s) }
+    }
+
+    private func draw(_ s: Stroke) {
+        let a = s.points[0], b = s.points[s.points.count - 1]
+        let r = NSRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
+        switch s.kind {
+        case .text:
+            (s.text as NSString).draw(at: a, withAttributes: [.font: NSFont.systemFont(ofSize: s.width * 6), .foregroundColor: s.color])
+        case .block:
+            s.color.withAlphaComponent(0.35).setFill()
+            NSBezierPath(rect: r).fill()
+        default:
             let p = NSBezierPath()
             p.lineWidth = s.width
             p.lineCapStyle = .round
             p.lineJoinStyle = .round
-            p.move(to: s.points[0])
-            for pt in s.points.dropFirst() { p.line(to: pt) }
-            if s.points.count == 1 { p.line(to: s.points[0]) }
+            switch s.kind {
+            case .rect: p.appendRect(r)
+            case .ellipse: p.appendOval(in: r)
+            case .arrow:
+                p.move(to: a); p.line(to: b)
+                let angle = atan2(b.y - a.y, b.x - a.x), len = s.width * 4 + 12
+                for d in [CGFloat.pi * 0.85, -CGFloat.pi * 0.85] {
+                    p.move(to: b); p.line(to: NSPoint(x: b.x + len * cos(angle + d), y: b.y + len * sin(angle + d)))
+                }
+            default:
+                p.move(to: a)
+                for pt in s.points.dropFirst() { p.line(to: pt) }
+                if s.points.count == 1 { p.line(to: a) }
+            }
             s.color.setStroke()
             p.stroke()
         }
     }
 
     override func mouseDown(with e: NSEvent) {
-        current = Stroke(points: [convert(e.locationInWindow, from: nil)], color: penColor, width: penWidth)
+        commitText()
+        let p = convert(e.locationInWindow, from: nil)
+        if tool == .text {
+            let f = NSTextField(frame: NSRect(x: p.x, y: p.y, width: 300, height: penWidth * 6 + 8))
+            f.font = NSFont.systemFont(ofSize: penWidth * 6)
+            f.textColor = penColor
+            f.isBordered = false; f.drawsBackground = false; f.focusRingType = .none
+            f.delegate = self
+            addSubview(f); field = f
+            window?.makeKeyAndOrderFront(nil)
+            window?.makeFirstResponder(f)
+            return
+        }
+        current = Stroke(points: [p, p], color: penColor, width: penWidth, kind: tool)
         needsDisplay = true
     }
     override func mouseDragged(with e: NSEvent) {
-        current?.points.append(convert(e.locationInWindow, from: nil))
+        guard var s = current else { return }
+        let p = convert(e.locationInWindow, from: nil)
+        if s.kind == .pen { s.points.append(p) } else { s.points[1] = p }
+        current = s
         needsDisplay = true
     }
     override func mouseUp(with e: NSEvent) {
-        if let s = current { strokes.append(s); history.append(self) }
+        if let s = current, s.kind == .pen || s.points[0] != s.points[1] { strokes.append(s); history.append(self) }
         current = nil
         needsDisplay = true
     }
+
+    // Enter, Esc, or clicking elsewhere finishes the text field and turns it into a stroke.
+    func commitText() {
+        guard let f = field else { return }
+        field = nil
+        if !f.stringValue.isEmpty {
+            strokes.append(Stroke(points: [f.frame.origin], color: f.textColor ?? penColor, width: penWidth, kind: .text, text: f.stringValue))
+            history.append(self)
+        }
+        f.removeFromSuperview()
+        needsDisplay = true
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.insertNewline(_:)) || selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        commitText()
+        return true
+    }
+    func controlTextDidEndEditing(_ obj: Notification) { commitText() }
 }
 
-final class DrawWindow: NSWindow {
+// A nonactivating panel can be the key window (keys, text input) without the accessory app ever becoming active.
+final class DrawWindow: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func keyDown(with e: NSEvent) {
@@ -69,9 +131,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var views: [CanvasView] = []
     var drawing = false
     var item: NSStatusItem!
+    var panel: NSPanel!
 
     func applicationDidFinishLaunching(_ n: Notification) {
         buildWindows()
+        buildPanel()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                object: nil, queue: .main) { [weak self] _ in self?.buildWindows() }
 
@@ -93,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windows.forEach { $0.close() }
         windows.removeAll(); views.removeAll(); history.removeAll()
         for screen in NSScreen.screens {
-            let w = DrawWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            let w = DrawWindow(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             w.setFrame(screen.frame, display: false)
             w.isOpaque = false
             w.backgroundColor = .clear
@@ -101,12 +165,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.level = .screenSaver
             w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
             w.ignoresMouseEvents = !drawing
+            w.hidesOnDeactivate = false
             w.isReleasedWhenClosed = false
             let v = CanvasView(frame: NSRect(origin: .zero, size: screen.frame.size))
             w.contentView = v
             w.orderFrontRegardless()
             windows.append(w); views.append(v)
         }
+    }
+
+    // Floating toolbar shown while drawing; nonactivating so keys still go to the canvas.
+    func buildPanel() {
+        let stack = NSStackView()
+        stack.orientation = .horizontal
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        for (i, title) in ["Олівець", "Текст", "Стрілка"].enumerated() {
+            let b = NSButton(title: title, target: self, action: #selector(pickTool(_:)))
+            b.tag = i
+            stack.addArrangedSubview(b)
+        }
+        let obj = NSPopUpButton(frame: .zero, pullsDown: false)
+        obj.addItems(withTitles: ["Прямокутник", "Коло", "Блок"])
+        obj.target = self; obj.action = #selector(pickObject(_:))
+        stack.addArrangedSubview(obj)
+        let well = NSColorWell()
+        well.color = penColor
+        well.target = self; well.action = #selector(pickColor(_:))
+        stack.addArrangedSubview(well)
+        for (title, sel) in [("Скасувати", #selector(undo)), ("Очистити", #selector(clear)), ("Вийти", #selector(toggle))] {
+            stack.addArrangedSubview(NSButton(title: title, target: self, action: sel))
+        }
+        stack.wantsLayer = true
+        stack.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        stack.layer?.cornerRadius = 10
+        let size = stack.fittingSize
+        stack.frame = NSRect(origin: .zero, size: size)
+        panel = NSPanel(contentRect: stack.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.contentView = stack
+        panel.isFloatingPanel = true
+        panel.hidesOnDeactivate = false
+        // One level above the overlays, otherwise a click on the canvas raises the overlay over the panel.
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+        panel.hasShadow = true
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        let screen = NSScreen.main?.frame ?? .zero
+        panel.setFrameOrigin(NSPoint(x: screen.midX - size.width / 2, y: screen.minY + 60))
+    }
+
+    @objc func pickTool(_ sender: NSButton) { setTool([.pen, .text, .arrow][sender.tag]) }
+    @objc func pickObject(_ sender: NSPopUpButton) { setTool([.rect, .ellipse, .block][sender.indexOfSelectedItem]) }
+    @objc func pickColor(_ sender: NSColorWell) { penColor = sender.color }
+
+    func setTool(_ t: Tool) {
+        views.forEach { $0.commitText() }
+        tool = t
     }
 
     @objc func toggle() {
@@ -116,16 +230,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if drawing {
             NSApp.activate(ignoringOtherApps: true)
             windows.first?.makeKeyAndOrderFront(nil)
+            panel.orderFrontRegardless()
+        } else {
+            views.forEach { $0.commitText() }
+            panel.orderOut(nil)
         }
         NSCursor.crosshair.set()
     }
 
     @objc func clear() {
-        views.forEach { $0.strokes.removeAll(); $0.needsDisplay = true }
+        views.forEach { $0.commitText(); $0.strokes.removeAll(); $0.needsDisplay = true }
         history.removeAll()
     }
 
-    func undo() {
+    @objc func undo() {
         guard let v = history.popLast() else { return }
         _ = v.strokes.popLast()
         v.needsDisplay = true

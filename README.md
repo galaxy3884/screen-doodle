@@ -10,6 +10,10 @@ A tiny macOS menu bar app for drawing on top of your screen: annotate anything, 
 - `⌃⌥D` — toggle drawing mode
 - `⌃⌥C` — clear the screen
 
+**Toolbar.** A floating panel appears while drawing: Pen, Text, Arrow, Object (Rectangle, Circle, Block), color picker, Undo, Clear, Exit.
+- Text: pick *Text*, click anywhere, type, press `Return` or `Esc`. `[` / `]` change the text size too.
+- Arrow, Rectangle, Circle, Block: drag to draw in the current color. Block is a translucent filled rectangle.
+
 **While drawing**
 - `1`–`6` — red, yellow, green, blue, white, black
 - `[` / `]` — thinner / thicker pen
