@@ -16,6 +16,8 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     var field: NSTextField?
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: .crosshair) }
+    // The app never becomes active, so without this the first click on the canvas can be swallowed.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
         for s in strokes + (current.map { [$0] } ?? []) { draw(s) }
@@ -185,8 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             b.tag = i
             stack.addArrangedSubview(b)
         }
-        let obj = NSPopUpButton(frame: .zero, pullsDown: false)
-        obj.addItems(withTitles: ["Прямокутник", "Коло", "Блок"])
+        let obj = NSPopUpButton(frame: .zero, pullsDown: true)
+        obj.addItems(withTitles: ["Об'єкт", "Прямокутник", "Коло", "Блок"])
         obj.target = self; obj.action = #selector(pickObject(_:))
         stack.addArrangedSubview(obj)
         stack.addArrangedSubview(NSButton(title: "Колір", target: self, action: #selector(showColors)))
@@ -212,7 +214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func pickTool(_ sender: NSButton) { setTool([.pen, .text, .arrow][sender.tag]) }
-    @objc func pickObject(_ sender: NSPopUpButton) { setTool([.rect, .ellipse, .block][sender.indexOfSelectedItem]) }
+    @objc func pickObject(_ sender: NSPopUpButton) { setTool([.rect, .ellipse, .block][max(sender.indexOfSelectedItem, 1) - 1]) }
     @objc func colorChanged(_ sender: NSColorPanel) { penColor = sender.color }
 
     @objc func showColors() {
