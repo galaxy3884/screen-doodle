@@ -189,10 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         obj.addItems(withTitles: ["Прямокутник", "Коло", "Блок"])
         obj.target = self; obj.action = #selector(pickObject(_:))
         stack.addArrangedSubview(obj)
-        let well = NSColorWell()
-        well.color = penColor
-        well.target = self; well.action = #selector(pickColor(_:))
-        stack.addArrangedSubview(well)
+        stack.addArrangedSubview(NSButton(title: "Колір", target: self, action: #selector(showColors)))
         for (title, sel) in [("Скасувати", #selector(undo)), ("Очистити", #selector(clear)), ("Вийти", #selector(toggle))] {
             stack.addArrangedSubview(NSButton(title: title, target: self, action: sel))
         }
@@ -216,7 +213,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func pickTool(_ sender: NSButton) { setTool([.pen, .text, .arrow][sender.tag]) }
     @objc func pickObject(_ sender: NSPopUpButton) { setTool([.rect, .ellipse, .block][sender.indexOfSelectedItem]) }
-    @objc func pickColor(_ sender: NSColorWell) { penColor = sender.color }
+    @objc func colorChanged(_ sender: NSColorPanel) { penColor = sender.color }
+
+    @objc func showColors() {
+        let p = NSColorPanel.shared
+        p.color = penColor
+        p.setTarget(self); p.setAction(#selector(colorChanged(_:)))
+        p.hidesOnDeactivate = false
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        p.orderFront(nil)
+        // orderFront resets the level, so set it after; it must sit above the overlays or its clicks land on the canvas.
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 2)
+    }
 
     func setTool(_ t: Tool) {
         views.forEach { $0.commitText() }
