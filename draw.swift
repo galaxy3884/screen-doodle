@@ -242,6 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             views.forEach { $0.commitText() }
             panel.orderOut(nil)
+            NSColorPanel.shared.orderOut(nil)
         }
         NSCursor.crosshair.set()
     }
